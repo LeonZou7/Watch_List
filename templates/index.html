@@ -4,12 +4,12 @@
     <meta charset="UTF-8">
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}" type="text/css">
     <link rel="icon" href="{{ url_for('static', filename='images/favicon.ico') }}">
-    <title>{{ name }}'s watch list</title>
+    <title>{{ user.name }}'s watchlist</title>
 </head>
 <body>
     <h2>
         <img alt="logo" class="logo" src="{{ url_for('static', filename='images/logo.png') }}">
-        {{ name }}'s watchlist:
+        {{ user.name }}:
     </h2>
     {# 使用length 过滤器获得movies变量的长度 等同于py的len(movies)#}
     <p>{{ movies|length }} movies</p>
