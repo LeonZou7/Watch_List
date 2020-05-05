@@ -1,12 +1,21 @@
 from flask import Flask
-from flask import url_for
+from flask import url_for   # 生成URL
+from flask import render_template # 渲染模板
 app = Flask(__name__)
+
+# 模板测试数据
+name = 'Leon'
+movies = [
+    {'title': 'Naruto', 'year': '1998'},
+    {'title': 'King of Comedy', 'year': '1999'},
+    {'title': 'Identity', 'year': '2003'}
+]
 
 
 @app.route('/')  # 装饰器，与传入的字符串参数作为URL规则进行绑定（可多个），'/'指根目录
 @app.route('/home')
 def hello():
-    return 'hello, flask!'
+    return render_template('index.html', name=name, movies=movies)
 
 
 @app.route('/user/<user_name>')   # <>可以传入自定义参数，但要注意参数名要和修饰的函数参数名一致(user_name)
