@@ -1,6 +1,9 @@
 from flask import Flask
 from flask import url_for   # 生成URL
 from flask import render_template   # 渲染模板
+from flask import request   # 请求对象
+from flask import redirect  # 重定向
+from flask import flash     # 消息提示
 from flask_sqlalchemy import SQLAlchemy     # 数据库拓展
 import os
 import click
@@ -10,6 +13,7 @@ app = Flask(__name__)   # 注册应用
 # 配置数据库连接地址，win三斜线，其他四斜线
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///' + os.path.join(app.root_path, 'data.db')
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False    # 关闭对模型修改的监控
+app.config['SECRET_KEY'] = 'dev'    # 签名密钥（存于cookie中）
 
 db = SQLAlchemy(app)
 
@@ -22,17 +26,55 @@ db = SQLAlchemy(app)
 # ]
 
 
-@app.route('/')  # 装饰器，与传入的字符串参数作为URL规则进行绑定（可多个），'/'指根目录
-@app.route('/home')
+@app.route('/', methods=['GET', 'POST'])  # 装饰器，与传入的字符串参数作为URL规则进行绑定（可多个），'/'指根目录
 def index():
-    user = User.query.first()
+    if request.method == 'POST':
+        title = request.form.get('title')
+        year = request.form.get('year')
+        if not title or not year or len(year) > 4 or len(title) > 60:
+            flash('Invalid input! Please try again.')   # 错误提示
+            return redirect(url_for('index'))   # 重定向回主页
+        movie = Movie(title=title, year=year)
+        db.session.add(movie)
+        db.session.commit()
+        flash('Item added.')    # 成功添加提示
+        return redirect(url_for('index'))
+
     movies = Movie.query.all()
     return render_template('index.html', movies=movies)  # 渲染模板
 
 
+@app.route('/movie/edit/<int:movie_id>', methods=['GET', 'POST'])
+def edit(movie_id):     # 编辑记录
+    movie = Movie.query.get_or_404(movie_id)
+
+    if request.method == 'POST':
+        title = request.form['title']
+        year = request.form['year']
+        if not title or not year or len(title) > 60 or len(year) > 4:
+            flash('Invalid input! Please try again.')
+            return redirect(url_for('edit', movie_id=movie_id))
+
+        movie.title = title
+        movie.year = year
+        db.session.commit()
+        flash('Successful updated.')
+        return redirect(url_for('index'))
+
+    return render_template('edit.html', movie=movie)    # 传入被编辑的记录
+
+
+@app.route('/movie/delete/<int:movie_id>', methods=['POST'])     # 只能用post删除
+def delete(movie_id):
+    movie = Movie.query.get_or_404(movie_id)
+    db.session.delete(movie)
+    db.session.commit()
+    flash('Item deleted.')
+    return render_template(url_for('index'))
+
+
 @app.errorhandler(404)  # errorhandler专门用来处理错误，参数为错误代码
 def page_not_found(e):
-    user = User.query.first()
     return render_template('404.html'), 404  # 返回模板，状态码
 
 

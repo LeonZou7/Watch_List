@@ -3,14 +3,23 @@
 {% block content %}
     {# 使用length 过滤器获得movies变量的长度 等同于py的len(movies)#}
     <p>{{ movies|length }} movies</p>
+    <form method="post">
+        Name <input type="text" name="title" autocomplete="off" required>
+        Year <input type="text" name="year" autocomplete="off" required>
+        <input class="btn" type="submit" value="Add">
+    </form>
     <ul class="movie_list">
         {% for movie in movies %}
         <li>
             {{ movie.title }} - {{ movie.year }}    {# 等同于movie['title'] #}
                 <span class="float_right">
+                    <a class="btn" href="{{ url_for('edit', movie_id=movie.id) }}">Edit</a>
                     <a class="douban"
                        href="https://search.douban.com/movie/subject_search?search_text={{ movie.title }}"
                        target="_blank" title="Douban">Douban</a>
+                    <form class="inline_form" method="post" action="{{ url_for('delete', movie_id=movie.id) }}">
+                        <input class="btn" type="submit" name="delete" value="Delete" onclick="return confirm('Click to confirm')">
+                    </form>
                 </span>
         </li>
         {% endfor %}
