@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    {% block head %}
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ user.name }}'s Watchlist</title>
+    <link rel="icon" href="{{ url_for('static', filename='images/favicon.ico') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}" type="text/css">
+    {% endblock %}
+</head>
+<body>
+    <h2>
+        <img alt="logo" class="logo" src="{{ url_for('static', filename='images/logo.png') }}">
+        {{ user.name }}'s Watchlist
+    </h2>
+<nav>
+    <ul>
+        <li><a href="{{ url_for('index') }}">Home</a></li>
+    </ul>
+</nav>
+{% block content %}
+    {% endblock %}
+<footer>
+    <img alt="Chihiro" class="Chihiro" src="{{ url_for('static', filename='images/Chihiro.gif') }}">
+    <small>
+        Created by <a href="https://github.com/LeonZou7">Leon</a>
+    </small>
+</footer>
+</body>
+</html>

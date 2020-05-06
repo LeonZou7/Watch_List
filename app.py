@@ -27,7 +27,13 @@ db = SQLAlchemy(app)
 def index():
     user = User.query.first()
     movies = Movie.query.all()
-    return render_template('index.html', user=user, movies=movies)  # 读取模板
+    return render_template('index.html', movies=movies)  # 渲染模板
+
+
+@app.errorhandler(404)  # errorhandler专门用来处理错误，参数为错误代码
+def page_not_found(e):
+    user = User.query.first()
+    return render_template('404.html'), 404  # 返回模板，状态码
 
 
 @app.route('/user/<user_name>')   # <>可以传入自定义参数，但要注意参数名要和修饰的函数参数名一致(user_name)
@@ -35,8 +41,14 @@ def user_page(user_name):
     return 'This is {} page'.format(user_name)
 
 
+@app.context_processor  # 模板上下文处理函数，返回的字典会统一注入每一个模板的上下文中，无需重复写入
+def inject_user():
+    user = User.query.first()
+    return dict(user=user)  # 需返回字典，等同于return {'user': user}
+
+
 # 'url_for'函数常用来根据传入的参数生成URL
-# 视图函数名可以作为代表某个路由的端点(endpoint)，同时用来生成URL，'url_for'函数接受的第一个参数就是端点值，默认是视图函数的名称
+# 视图函数名可以作为端点(endpoint)，同时用来生成URL，'url_for'函数接受的第一个参数就是端点值，默认是视图函数的名称
 @app.route('/test')
 def test_url_for():
     print(url_for('home'))  # '/home'
