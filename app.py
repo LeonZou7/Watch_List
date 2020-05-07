@@ -5,6 +5,8 @@ from flask import request   # 请求对象
 from flask import redirect  # 重定向
 from flask import flash     # 消息提示
 from flask_sqlalchemy import SQLAlchemy     # 数据库拓展
+from flask_login import LoginManager, UserMixin, login_required, current_user, login_user  # 用户认证
+from werkzeug.security import generate_password_hash, check_password_hash   # 用户安全
 import os
 import click
 
@@ -14,6 +16,9 @@ app = Flask(__name__)   # 注册应用
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///' + os.path.join(app.root_path, 'data.db')
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False    # 关闭对模型修改的监控
 app.config['SECRET_KEY'] = 'dev'    # 签名密钥（存于cookie中）
+
+login_manager = LoginManager(app)
+login_manager.login_view = 'login'
 
 db = SQLAlchemy(app)
 
@@ -29,11 +34,15 @@ db = SQLAlchemy(app)
 @app.route('/', methods=['GET', 'POST'])  # 装饰器，与传入的字符串参数作为URL规则进行绑定（可多个），'/'指根目录
 def index():
     if request.method == 'POST':
+        if not current_user.is_authenticated:   # 若没有用户认证 则重定向返回主页
+            return redirect(url_for('index'))
+
         title = request.form.get('title')
         year = request.form.get('year')
         if not title or not year or len(year) > 4 or len(title) > 60:
             flash('Invalid input! Please try again.')   # 错误提示
             return redirect(url_for('index'))   # 重定向回主页
+
         movie = Movie(title=title, year=year)
         db.session.add(movie)
         db.session.commit()
@@ -45,6 +54,7 @@ def index():
 
 
 @app.route('/movie/edit/<int:movie_id>', methods=['GET', 'POST'])
+@login_required     # 需要用户认证
 def edit(movie_id):     # 编辑记录
     movie = Movie.query.get_or_404(movie_id)
 
@@ -65,6 +75,7 @@ def edit(movie_id):     # 编辑记录
 
 
 @app.route('/movie/delete/<int:movie_id>', methods=['POST'])     # 只能用post删除
+@login_required     # 需要用户认证
 def delete(movie_id):
     movie = Movie.query.get_or_404(movie_id)
     db.session.delete(movie)
@@ -81,6 +92,59 @@ def page_not_found(e):
 @app.route('/user/<user_name>')   # <>可以传入自定义参数，但要注意参数名要和修饰的函数参数名一致(user_name)
 def user_page(user_name):
     return 'This is {} page'.format(user_name)
+
+
+@app.route('/login', methods=['GET', 'POST'])
+def login():    # 登录函数
+    if request.method == 'POST':
+        username = request.form['username']
+        password = request.form['password']
+
+        if not username or not password:
+            flash('Invalid input! Please try again.')
+            return redirect(url_for('login'))
+
+        user = User.query.first()
+
+        if username == user.user_name and user.validate_password(password):
+            login_user(user)
+            flash('Login success.')
+            return redirect(url_for('index'))
+
+        return redirect(url_for('login'))
+
+    return render_template('login.html')
+
+
+@app.route('/logout')
+def logout():
+    load_user()     # 用户登出
+    flash('Logout success.')
+    return redirect(url_for('index'))
+
+
+@app.route('/settings', methods=['GET', 'POST'])
+@ login_required    # 用户认证
+def settings():     # 修改用户名
+    if request.method == 'POST':
+        name = request.form['name']
+
+        if not name or len(name) > 20:
+            flash('Invalid input! Please try again.')
+            return redirect(url_for('settings'))
+
+        current_user.name = name    # 等同于User.query.first().name = name
+        db.session.commit()
+        flash('Settings updated.')
+        return redirect(url_for('index'))
+
+    return render_template('settings.html')
+
+
+@login_manager.user_loader
+def load_user(user_id):     # 用户加载回调函数，查询用户id然后返回用户对象
+    user = User.query.get(int(user_id))
+    return user
 
 
 @app.context_processor  # 模板上下文处理函数，返回的字典会统一注入每一个模板的上下文中，无需重复写入
@@ -111,11 +175,41 @@ def initdb(drop):   # 初始化数据库
     click.echo('Initialized database.')
 
 
+@app.cli.command()
+@click.option('--username', prompt=True, help='The username to login.')
+# hide_input参数隐藏输入，confirmation_prompt参数要求二次确认
+@click.option('--password', prompt=True, hide_input=True, confirmation_prompt=True, help='The password to login.')
+def admin(username, password):
+    db.create_all()
+    user = User.query.first()
+
+    if user is not None:    # 用户存在，设置密码
+        click.echo('Updating user...')
+        user.user_name = username
+        user.set_password(password)
+    else:   # 用户不存在，新建并设置密码
+        click.echo('Creating user...')
+        user = User(user_name=username, name='Admin')
+        user.set_password(password)
+        db.session.add(user)
+
+    db.session.commit()     # 保存到数据库
+    click.echo('Done.')
+
+
 # 创建数据库模型，写完之后要在flask shell中from app import db -> db.create_all()
 # 若要重新生成表，则需要先db.drop_all() -> db.create_all()
-class User(db.Model):   # user模型，继承db.Model而来，表名为user（小写，自动生成）
+class User(db.Model, UserMixin):   # user模型，继承db.Model而来，表名为user（小写，自动生成）
     id = db.Column(db.Integer, primary_key=True)    # 每一个字段要实例化db.Column，传入字段类型
     name = db.Column(db.String(20))
+    user_name = db.Column(db.String(20))    # 用户名
+    password_hash = db.Column(db.String(128))   # 密码散列值
+
+    def set_password(self, password):
+        self.password_hash = generate_password_hash(password)
+
+    def validate_password(self, password):
+        return check_password_hash(self.password_hash, password)
 
 
 class Movie(db.Model):  # movie模型
