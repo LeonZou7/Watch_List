@@ -5,7 +5,7 @@ from flask import request   # 请求对象
 from flask import redirect  # 重定向
 from flask import flash     # 消息提示
 from flask_sqlalchemy import SQLAlchemy     # 数据库拓展
-from flask_login import LoginManager, UserMixin, login_required, current_user, login_user  # 用户认证
+from flask_login import LoginManager, UserMixin, login_required, current_user, login_user, logout_user  # 用户认证
 from werkzeug.security import generate_password_hash, check_password_hash   # 用户安全
 import os
 import click
@@ -81,7 +81,7 @@ def delete(movie_id):
     db.session.delete(movie)
     db.session.commit()
     flash('Item deleted.')
-    return render_template(url_for('index'))
+    return redirect(url_for('index'))
 
 
 @app.errorhandler(404)  # errorhandler专门用来处理错误，参数为错误代码
@@ -110,6 +110,8 @@ def login():    # 登录函数
             login_user(user)
             flash('Login success.')
             return redirect(url_for('index'))
+        else:
+            flash('Invalid input! Please try again.')
 
         return redirect(url_for('login'))
 
@@ -118,7 +120,7 @@ def login():    # 登录函数
 
 @app.route('/logout')
 def logout():
-    load_user()     # 用户登出
+    logout_user()     # 用户登出
     flash('Logout success.')
     return redirect(url_for('index'))
 
@@ -197,6 +199,34 @@ def admin(username, password):
     click.echo('Done.')
 
 
+# 一键加入虚拟数据
+@app.cli.command()
+def forge():
+    db.create_all()
+    name = 'Leon'
+    movies = [
+        {'title': 'My Neighbor Totoro', 'year': '1988'},
+        {'title': 'Dead Poets Society', 'year': '1989'},
+        {'title': 'A Perfect World', 'year': '1993'},
+        {'title': 'Leon', 'year': '1994'},
+        {'title': 'Mahjong', 'year': '1996'},
+        {'title': 'Swallowtail Butterfly', 'year': '1996'},
+        {'title': 'King of Comedy', 'year': '1999'},
+        {'title': 'Devils on the Doorstep', 'year': '1999'},
+        {'title': 'WALL-E', 'year': '2008'},
+        {'title': 'The Pork of Music', 'year': '2012'},
+    ]
+
+    user = User(name=name)
+    db.session.add(user)
+    for m in movies:
+        movie = Movie(title=m['title'], year=m['year'])
+        db.session.add(movie)
+
+    db.session.commit()
+    click.echo('Done.')
+
+
 # 创建数据库模型，写完之后要在flask shell中from app import db -> db.create_all()
 # 若要重新生成表，则需要先db.drop_all() -> db.create_all()
 class User(db.Model, UserMixin):   # user模型，继承db.Model而来，表名为user（小写，自动生成）
@@ -216,3 +246,4 @@ class Movie(db.Model):  # movie模型
     id = db.Column(db.Integer, primary_key=True)
     title = db.Column(db.String(60))
     year = db.Column(db.String(4))
+
